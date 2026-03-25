@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package form.v1;
+
+// Maps the generated Go code to your module path
+option go_package = "github.com/akhenakh/grpc-form/gen/form/v1;formv1";
+
+import "google/protobuf/descriptor.proto";
+
+// Message-level UI options
+extend google.protobuf.MessageOptions {
+  string title = 50001;
+  string description = 50002;
+}
+
+// Field-level UI options
+extend google.protobuf.FieldOptions {
+  FieldOptions field = 50003;
+}
+
+message FieldOptions {
+  bool hidden = 1;
+  string label = 2;
+  string hint = 3;
+  string placeholder = 4;
+  bool collapsible = 5;
+  int32 order = 6;
+}

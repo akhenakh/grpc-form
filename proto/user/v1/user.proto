@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "github.com/akhenakh/grpc-form/gen/user/v1;userv1";
+
+import "buf/validate/validate.proto";
+import "form/v1/annotations.proto";
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+}
+
+message CreateUserRequest {
+  option (form.v1.title) = "Create New User";
+  option (form.v1.description) = "Provision a new user account in the system.";
+
+  string username = 1 [
+    (buf.validate.field).string.min_len = 3,
+    (buf.validate.field).string.max_len = 32,
+    (form.v1.field).label = "Username",
+    (form.v1.field).placeholder = "johndoe88"
+  ];
+
+  string firstname = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (form.v1.field).label = "First Name",
+    (form.v1.field).hint = "User's legal first name"
+  ];
+
+  string email = 3 [
+    (buf.validate.field).string.email = true,
+    (form.v1.field).label = "Email Address"
+  ];
+
+  // We hide the UUID field from the form.
+  // IGNORE_IF_ZERO_VALUE ensures protovalidate skips the UUID check 
+  // if the field is omitted/empty (which it will be, since it's hidden).
+  string uuid = 4 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE, 
+    (form.v1.field).hidden = true
+  ];
+}
+
+message CreateUserResponse {
+  string message = 1;
+  string user_id = 2;
+}

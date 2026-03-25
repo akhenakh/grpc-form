@@ -1,0 +1,6 @@
+version: v2
+modules:
+  - path: proto
+    name: buf.build/akhenakh/grpc-form
+deps:
+  - buf.build/bufbuild/protovalidate

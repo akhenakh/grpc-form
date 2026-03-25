@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- (Keep all your CSS <style> block exactly the same as your prompt) -->
+<head>
+  <meta charset="UTF-8" />
+  <title>Proto Admin Form Builder</title>
+  <style>/* ... YOUR CSS HERE ... */</style>
+</head>
+<body>
+<div class="app">
+  <div class="app-header">
+    <h1>Admin Form Builder</h1>
+    <span>Driven by gRPC Reflection & Protovalidate</span>
+  </div>
+
+  <div class="main-grid">
+    <!-- LEFT: Form Selection -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-label">Available Admin Actions</span>
+      </div>
+      <div class="panel-body">
+        <p style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px;">
+          Select a method. Your available methods are restricted by your role mapping in the API Gateway.
+        </p>
+        <select id="methodSelector" class="field-input" style="margin-bottom: 16px;">
+          <option value="">-- Select an Action --</option>
+        </select>
+        
+        <div class="btn-row">
+          <button class="primary" onclick="loadSchema()">Load Form</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Form output -->
+    <div class="panel">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('form', this)">Action Form</div>
+        <div class="tab" onclick="switchTab('output', this)">Server Response</div>
+      </div>
+
+      <div id="tabForm" class="tab-content active">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-icon">⬡</div>
+          <div>Select an action from the left to load the form.</div>
+        </div>
+        <div id="formCard" style="display:none; display:flex; flex-direction:column; gap:14px;"></div>
+      </div>
+
+      <div id="tabOutput" class="tab-content">
+        <div class="code-view" id="outputView">Submit the form to see the gRPC response.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentSchema = null;
+let currentMethod = null;
+let currentServiceId = null;
+let formValues = {};
+let formErrors = {};
+let oneofSelections = {};
+let repeatedItems = {};
+
+// 1. Fetch available methods on load
+window.onload = async () => {
+  const res = await fetch('/api/methods');
+  const methods = await res.json();
+  const sel = document.getElementById('methodSelector');
+  methods.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.service_id + '|' + m.method;
+    opt.textContent = m.method.split('/').pop(); // Show just method name
+    sel.appendChild(opt);
+  });
+};
+
+// 2. Fetch schema for selected method
+async function loadSchema() {
+  const val = document.getElementById('methodSelector').value;
+  if(!val) return;
+  const [svc, meth] = val.split('|');
+  currentServiceId = svc;
+  currentMethod = meth;
+  
+  const res = await fetch(`/api/schema?service_id=${svc}&method=${meth}`);
+  currentSchema = await res.json();
+  
+  formValues = {}; formErrors = {};
+  renderForm(); // Re-use the exact same renderForm() from your snippet
+}
+
+// 3. Handle Submit (Send to backend)
+async function handleSubmit() {
+  if (!validateForm()) { renderForm(); return; }
+  
+  // Format payload
+  const payload = {};
+  for (const field of currentSchema.fields) {
+    if (field.hidden) continue;
+    if (field.repeated) {
+      payload[field.name] = (repeatedItems[field.name] || []).filter(Boolean);
+    } else if (formValues[field.name] !== undefined && formValues[field.name] !== '') {
+      // Cast integers correctly based on schema
+      if(field.type.includes("TYPE_INT") || field.type.includes("TYPE_DOUBLE")) {
+         payload[field.name] = Number(formValues[field.name]);
+      } else {
+         payload[field.name] = formValues[field.name];
+      }
+    }
+  }
+
+
+  // Send to Go Gateway
+  document.getElementById('outputView').textContent = "Invoking gRPC service...";
+  switchTab('output', document.querySelectorAll('.tab')[1]);
+
+  const res = await fetch(`/api/invoke?service_id=${currentServiceId}&method=${currentMethod}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+  if (!res.ok && data.violations) {
+     // Validation failed on server-side protovalidate
+     document.getElementById('outputView').innerHTML = `<span style="color:var(--color-text-danger)">Server Validation Error:\n${data.violations}</span>`;
+  } else {
+     document.getElementById('outputView').innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+  }
+}
+
+function handleReset() {
+  formValues = {};
+  formErrors = {};
+  repeatedItems = {};
+  oneofSelections = {};
+  collapsedGroups = {};
+  renderForm();
+}
+
+
+function getInputType(field) {
+  if (field.name.toLowerCase().includes('password')) return 'password';
+  if (field.validate.email) return 'email';
+  const numTypes = ['int32','int64','uint32','uint64','sint32','sint64','fixed32','fixed64','sfixed32','sfixed64','float','double'];
+  if (numTypes.includes(field.type)) return 'number';
+  if (field.type === 'bool') return 'checkbox';
+  return 'text';
+}
+
+
+// ---------------------------------------------------------------------------
+// Form renderer
+// ---------------------------------------------------------------------------
+function renderForm() {
+  const card    = document.getElementById('formCard');
+  const empty   = document.getElementById('emptyState');
+  const s       = currentSchema;
+
+  empty.style.display = 'none';
+  card.style.display  = 'flex';
+  card.innerHTML      = '';
+
+  // Title block
+  if (s.title) {
+    const t = document.createElement('div');
+    t.className = 'form-title-block';
+    t.innerHTML = `<h2>${s.title}</h2>${s.description ? `<p>${s.description}</p>` : ''}`;
+    card.appendChild(t);
+    const hr = document.createElement('hr'); hr.className = 'divider';
+    card.appendChild(hr);
+  }
+
+  // Group oneof fields
+  const oneofGroups = {};
+  for (const f of s.fields.filter(f => !f.hidden && f.oneofGroup)) {
+    (oneofGroups[f.oneofGroup] = oneofGroups[f.oneofGroup] || []).push(f);
+  }
+
+  const rendered = new Set();
+  for (const field of s.fields.filter(f => !f.hidden)) {
+    if (rendered.has(field.name)) continue;
+    if (field.oneofGroup) {
+      const g = field.oneofGroup;
+      if (rendered.has('_oneof_' + g)) continue;
+      rendered.add('_oneof_' + g);
+      oneofGroups[g].forEach(f => rendered.add(f.name));
+      if (!oneofSelections[g]) oneofSelections[g] = oneofGroups[g][0]?.name;
+      card.appendChild(renderOneofGroup(g, oneofGroups[g]));
+    } else {
+      rendered.add(field.name);
+      card.appendChild(renderField(field, s));
+    }
+  }
+
+  // Submit / reset
+  const submitRow = document.createElement('div');
+  submitRow.className = 'submit-row';
+  const submitBtn = document.createElement('button');
+  submitBtn.className = 'primary';
+  submitBtn.textContent = 'Submit';
+  submitBtn.onclick = handleSubmit;
+  const resetBtn = document.createElement('button');
+  resetBtn.textContent = 'Reset';
+  resetBtn.onclick = handleReset;
+  submitRow.appendChild(submitBtn);
+  submitRow.appendChild(resetBtn);
+  card.appendChild(submitRow);
+
+  const hiddenCount = s.fields.filter(f => f.hidden).length;
+  if (hiddenCount > 0) {
+    const note = document.createElement('div');
+    note.className = 'hidden-note';
+    note.textContent = `${hiddenCount} hidden field${hiddenCount > 1 ? 's' : ''} suppressed by (form.field).hidden annotation`;
+    card.appendChild(note);
+  }
+}
+
+
+
+function renderField(field, schema) {
+  if (field.isMessage && schema.messages[field.type]) {
+    return renderNestedMessage(field, schema);
+  }
+
+  const wrap = document.createElement('div');
+  wrap.className = 'field-group';
+  wrap.id = 'fg_' + field.name;
+
+  const inputType = getInputType(field);
+
+  // Checkbox: special layout
+  if (inputType === 'checkbox') {
+    const row = document.createElement('div');
+    row.className = 'checkbox-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'fi_' + field.name;
+    cb.checked = !!formValues[field.name];
+    cb.onchange = () => { formValues[field.name] = cb.checked; };
+    const lbl = document.createElement('label');
+    lbl.htmlFor = 'fi_' + field.name;
+    lbl.textContent = field.label;
+    row.appendChild(cb);
+    row.appendChild(lbl);
+    wrap.appendChild(row);
+    return wrap;
+  }
+
+  // Label + badges
+  const labelEl = document.createElement('div');
+  labelEl.className = 'field-label';
+  const badges = [];
+  if (field.validate.required)                         badges.push(`<span class="badge">required</span>`);
+  if (field.validate.email)                            badges.push(`<span class="badge">email</span>`);
+  if (field.validate.pattern)                          badges.push(`<span class="badge">regex</span>`);
+  if (field.validate.min !== undefined || field.validate.max !== undefined) {
+    const r = [
+      field.validate.min !== undefined ? `≥${field.validate.min}` : '',
+      field.validate.max !== undefined ? `≤${field.validate.max}` : '',
+    ].filter(Boolean).join(' ');
+    badges.push(`<span class="badge success">${r}</span>`);
+  }
+  if (field.validate.minLen || field.validate.maxLen) {
+    const l = [
+      field.validate.minLen ? `min ${field.validate.minLen}` : '',
+      field.validate.maxLen ? `max ${field.validate.maxLen}` : '',
+    ].filter(Boolean).join(', ');
+    badges.push(`<span class="badge">${l} chars</span>`);
+  }
+  labelEl.innerHTML = `${field.label} ${badges.join('')}`;
+  wrap.appendChild(labelEl);
+
+  if (field.repeated) {
+    // Repeated field: dynamic list
+    repeatedItems[field.name] = repeatedItems[field.name] || [''];
+    const listEl = document.createElement('div');
+    listEl.className = 'repeated-list';
+    listEl.id = 'rl_' + field.name;
+    repeatedItems[field.name].forEach((val, i) => {
+      listEl.appendChild(makeRepeatedItem(field, i, val));
+    });
+    wrap.appendChild(listEl);
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-add';
+    addBtn.textContent = '+ Add item';
+    addBtn.onclick = () => addRepeatedItem(field);
+    wrap.appendChild(addBtn);
+  } else if (field.isEnum && schema.enums[field.type]) {
+    // Enum: select
+    const sel = document.createElement('select');
+    sel.className = 'field-input';
+    sel.id = 'fi_' + field.name;
+    if (formErrors[field.name]) sel.classList.add('error');
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = '— Select —';
+    sel.appendChild(defOpt);
+    schema.enums[field.type].forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v.number;
+      opt.textContent = v.name.replace(/^[A-Z]+_/, '').replace(/_/g, ' ');
+      sel.appendChild(opt);
+    });
+    sel.value = formValues[field.name] || '';
+    sel.onchange = () => { formValues[field.name] = sel.value; clearError(field.name); };
+    wrap.appendChild(sel);
+  } else {
+    // Standard input
+    const inp = document.createElement('input');
+    inp.className = 'field-input' + (formErrors[field.name] ? ' error' : '');
+    inp.id = 'fi_' + field.name;
+    inp.type = inputType;
+    inp.placeholder = field.placeholder || '';
+    inp.value = formValues[field.name] || '';
+    if (field.validate.min !== undefined) inp.min = field.validate.min;
+    if (field.validate.max !== undefined) inp.max = field.validate.max;
+    inp.oninput = () => { formValues[field.name] = inp.value; clearError(field.name); };
+    wrap.appendChild(inp);
+  }
+
+  // Error message
+  if (formErrors[field.name]) {
+    const err = document.createElement('div');
+    err.className = 'field-error';
+    err.id = 'fe_' + field.name;
+    err.textContent = formErrors[field.name];
+    wrap.appendChild(err);
+  }
+
+  // Hint
+  if (field.hint) {
+    const hint = document.createElement('div');
+    hint.className = 'field-hint';
+    hint.textContent = field.hint;
+    wrap.appendChild(hint);
+  }
+
+  return wrap;
+}
+
+
+// ---------------------------------------------------------------------------
+// Validation (driven by protovalidate rules)
+// ---------------------------------------------------------------------------
+function validateForm() {
+  formErrors = {};
+  for (const field of currentSchema.fields) {
+    if (field.hidden) continue;
+    const val = String(formValues[field.name] ?? '');
+    const v = field.validate;
+    if (v.required && !val.trim())                       { formErrors[field.name] = 'This field is required'; continue; }
+    if (val && v.minLen  && val.length < v.minLen)       { formErrors[field.name] = `Minimum ${v.minLen} characters`; }
+    if (val && v.maxLen  && val.length > v.maxLen)       { formErrors[field.name] = `Maximum ${v.maxLen} characters`; }
+    if (val && v.email   && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) { formErrors[field.name] = 'Must be a valid email address'; }
+    if (val && v.pattern && !new RegExp(v.pattern).test(val))        { formErrors[field.name] = 'Does not match the expected format'; }
+    if (val && v.min !== undefined && parseFloat(val) < v.min)       { formErrors[field.name] = `Value must be ≥ ${v.min}`; }
+    if (val && v.max !== undefined && parseFloat(val) > v.max)       { formErrors[field.name] = `Value must be ≤ ${v.max}`; }
+  }
+  return Object.keys(formErrors).length === 0;
+}
+
+// ---------------------------------------------------------------------------
+// Tab management
+// ---------------------------------------------------------------------------
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  if (name === 'schema' && currentSchema) renderSchemaView();
+}
+
+function syntaxHighlight(json) {
+  return json.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    m => {
+      if (/^"/.test(m)) {
+        return /:$/.test(m) ? `<span class="sk">${m}</span>` : `<span class="ss">${m}</span>`;
+      }
+      if (/true|false/.test(m)) return `<span class="sb">${m}</span>`;
+      return `<span class="sn">${m}</span>`;
+    }
+  );
+}
+
+
+
+</script>
+</body>
+</html>

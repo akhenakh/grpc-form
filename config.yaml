@@ -1,0 +1,9 @@
+server:
+  port: 8080
+services:
+  - id: "user-service"
+    name: "User Management"
+    target: "localhost:50051"
+    methods:
+      - "user.v1.UserService/CreateUser"
+    roles: ["admin"]
