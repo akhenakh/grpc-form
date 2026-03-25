@@ -41,9 +41,10 @@ var validateCSS []byte
 
 // EnvConfig holds server-level configuration from environment variables.
 type EnvConfig struct {
-	LogLevel   string `env:"LOG_LEVEL" envDefault:"INFO"`
-	HTTPPort   int    `env:"HTTP_PORT" envDefault:"8080"`
-	ConfigPath string `env:"CONFIG_PATH" envDefault:"config.yaml"`
+	LogLevel     string `env:"LOG_LEVEL" envDefault:"INFO"`
+	HTTPPort     int    `env:"HTTP_PORT" envDefault:"8080"`
+	ConfigPath   string `env:"CONFIG_PATH" envDefault:"config.yaml"`
+	AllowDevMode bool   `env:"ALLOW_DEV_MODE" envDefault:"false"`
 }
 
 // YAMLConfig holds the dynamic routing and role rules for the gateway.
@@ -65,6 +66,7 @@ type Gateway struct {
 	clients  map[string]*grpcreflect.Client
 	channels map[string]*grpc.ClientConn
 	logger   *slog.Logger
+	devMode  bool
 }
 
 func main() {
@@ -100,7 +102,7 @@ func main() {
 	g, gCtx := errgroup.WithContext(ctx)
 
 	// 3. Initialize Gateway state & gRPC clients
-	gw, err := NewGateway(ctx, yamlCfg.Services, logger)
+	gw, err := NewGateway(ctx, yamlCfg.Services, logger, envCfg.AllowDevMode)
 	if err != nil {
 		logger.Error("failed to initialize gateway", "error", err)
 		os.Exit(1)
@@ -146,12 +148,13 @@ func main() {
 }
 
 // NewGateway creates and connects the reflection clients.
-func NewGateway(ctx context.Context, services []ServiceConfig, logger *slog.Logger) (*Gateway, error) {
+func NewGateway(ctx context.Context, services []ServiceConfig, logger *slog.Logger, devMode bool) (*Gateway, error) {
 	gw := &Gateway{
 		services: services,
 		clients:  make(map[string]*grpcreflect.Client),
 		channels: make(map[string]*grpc.ClientConn),
 		logger:   logger,
+		devMode:  devMode,
 	}
 
 	for _, svc := range services {
@@ -197,7 +200,12 @@ func (g *Gateway) router() *http.ServeMux {
 func (g *Gateway) handleListMethods(w http.ResponseWriter, r *http.Request) {
 	userRole := r.Header.Get("X-User-Role")
 	if userRole == "" {
-		userRole = "admin" // Default for testing
+		if g.devMode {
+			userRole = "admin"
+		} else {
+			http.Error(w, "Unauthorized: missing X-User-Role header", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	var allowedMethods []map[string]string
@@ -217,6 +225,14 @@ func (g *Gateway) handleListMethods(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleGetSchema(w http.ResponseWriter, r *http.Request) {
+	userRole := r.Header.Get("X-User-Role")
+	if userRole == "" {
+		if !g.devMode {
+			http.Error(w, "Unauthorized: missing X-User-Role header", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	serviceID := r.URL.Query().Get("service_id")
 	methodName := r.URL.Query().Get("method")
 
@@ -250,12 +266,40 @@ func (g *Gateway) handleGetSchema(w http.ResponseWriter, r *http.Request) {
 }
 
 func (g *Gateway) handleInvoke(w http.ResponseWriter, r *http.Request) {
+	userRole := r.Header.Get("X-User-Role")
+	if userRole == "" {
+		if !g.devMode {
+			http.Error(w, "Unauthorized: missing X-User-Role header", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	serviceID := r.URL.Query().Get("service_id")
 	methodName := r.URL.Query().Get("method")
 
 	client, ok := g.clients[serviceID]
 	if !ok {
 		http.Error(w, "Service ID not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if the user's role has access to this method
+	allowed := false
+	for _, svc := range g.services {
+		if svc.ID == serviceID {
+			if contains(svc.Roles, userRole) {
+				for _, m := range svc.Methods {
+					if m == methodName {
+						allowed = true
+						break
+					}
+				}
+			}
+			break
+		}
+	}
+	if !allowed {
+		http.Error(w, "Forbidden: role not authorized for this method", http.StatusForbidden)
 		return
 	}
 
