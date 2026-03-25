@@ -386,6 +386,19 @@ body {
   flex-wrap: wrap;
 }
 
+.required-asterisk {
+  color: var(--color-text-danger);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.validation-hint {
+  font-size: 10px;
+  color: var(--color-text-info);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
 .badge {
   font-size: 10px;
   padding: 1px 6px;

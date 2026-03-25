@@ -135,10 +135,28 @@ function renderField(f) {
   }
 
   const badges = [];
-  if (f.validate.required) badges.push('<span class="badge">required</span>');
-  if (f.validate.email) badges.push('<span class="badge">email</span>');
+  const validationHints = [];
+  
+  if (f.validate.required) {
+    badges.push('<span class="required-asterisk">*</span>');
+  }
+  if (f.validate.email) {
+    validationHints.push('email');
+  }
   if (f.validate.minLen || f.validate.maxLen) {
-    badges.push(`<span class="badge">${f.validate.minLen||0}-${f.validate.maxLen||''} chars</span>`);
+    const min = f.validate.minLen || 0;
+    const max = f.validate.maxLen || '';
+    validationHints.push(`${min}${max ? '-' + max : '+'} chars`);
+  }
+  if (f.validate.min != null || f.validate.max != null) {
+    const min = f.validate.min != null ? f.validate.min : '';
+    const max = f.validate.max != null ? f.validate.max : '';
+    if (min !== '' || max !== '') {
+      validationHints.push(`${min}${max ? '-' + max : '+'}`);
+    }
+  }
+  if (f.validate.pattern) {
+    validationHints.push('pattern');
   }
 
   let input;
@@ -159,8 +177,11 @@ function renderField(f) {
 
   const errDiv = errors[f.name] ? `<div class="field-error">${errors[f.name]}</div>` : '';
   const hintDiv = f.hint ? `<div class="field-hint">${f.hint}</div>` : '';
+  const validationHintSpan = validationHints.length > 0 
+    ? `<span class="validation-hint">(${validationHints.join(', ')})</span>` 
+    : '';
 
-  return `<div class="field-group"><div class="field-label">${f.label} ${badges.join('')}</div>${input}${errDiv}${hintDiv}</div>`;
+  return `<div class="field-group"><div class="field-label">${f.label}${badges.join('')} ${validationHintSpan}</div>${input}${errDiv}${hintDiv}</div>`;
 }
 
 function renderRepeated(f) {

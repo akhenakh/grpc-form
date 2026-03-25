@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 
+	validate "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	"buf.build/go/protovalidate"
 	formv1 "github.com/akhenakh/grpc-form/gen/form/v1"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -69,6 +71,8 @@ func buildFieldSchema(rootSchema map[string]any, field protoreflect.FieldDescrip
 		}
 	}
 
+	validateRules := extractValidationRules(field)
+
 	fSchema := map[string]any{
 		"name":        string(field.Name()),
 		"type":        fType,
@@ -77,7 +81,7 @@ func buildFieldSchema(rootSchema map[string]any, field protoreflect.FieldDescrip
 		"hidden":      hidden,
 		"placeholder": placeholder,
 		"hint":        hint,
-		"validate":    map[string]any{},
+		"validate":    validateRules,
 		"isEnum":      field.Kind() == protoreflect.EnumKind,
 		"isMessage":   field.Kind() == protoreflect.MessageKind,
 	}
@@ -87,6 +91,108 @@ func buildFieldSchema(rootSchema map[string]any, field protoreflect.FieldDescrip
 	}
 
 	return fSchema
+}
+
+func extractValidationRules(field protoreflect.FieldDescriptor) map[string]any {
+	rules := make(map[string]any)
+
+	fieldRules, err := protovalidate.ResolveFieldRules(field)
+	if err != nil || fieldRules == nil {
+		return rules
+	}
+
+	if fieldRules.GetRequired() {
+		rules["required"] = true
+	}
+
+	switch r := fieldRules.GetType().(type) {
+	case *validate.FieldRules_String_:
+		sr := r.String_
+		if sr != nil {
+			if sr.GetMinLen() > 0 {
+				rules["minLen"] = int(sr.GetMinLen())
+			}
+			if sr.GetMaxLen() > 0 {
+				rules["maxLen"] = int(sr.GetMaxLen())
+			}
+			if sr.GetEmail() {
+				rules["email"] = true
+			}
+			if sr.GetPattern() != "" {
+				rules["pattern"] = sr.GetPattern()
+			}
+			if sr.GetMinBytes() > 0 {
+				rules["minBytes"] = int(sr.GetMinBytes())
+			}
+			if sr.GetMaxBytes() > 0 {
+				rules["maxBytes"] = int(sr.GetMaxBytes())
+			}
+		}
+	case *validate.FieldRules_Int64:
+		ir := r.Int64
+		if ir != nil {
+			if ir.GetConst() != 0 || ir.HasGt() || ir.HasGte() || ir.HasLt() || ir.HasLte() {
+				if ir.HasGte() {
+					rules["min"] = int(ir.GetGte())
+				}
+				if ir.HasLte() {
+					rules["max"] = int(ir.GetLte())
+				}
+			}
+		}
+	case *validate.FieldRules_Int32:
+		ir := r.Int32
+		if ir != nil {
+			if ir.HasGte() {
+				rules["min"] = int(ir.GetGte())
+			}
+			if ir.HasLte() {
+				rules["max"] = int(ir.GetLte())
+			}
+		}
+	case *validate.FieldRules_Uint64:
+		ur := r.Uint64
+		if ur != nil {
+			if ur.HasGte() {
+				rules["min"] = int(ur.GetGte())
+			}
+			if ur.HasLte() {
+				rules["max"] = int(ur.GetLte())
+			}
+		}
+	case *validate.FieldRules_Uint32:
+		ur := r.Uint32
+		if ur != nil {
+			if ur.HasGte() {
+				rules["min"] = int(ur.GetGte())
+			}
+			if ur.HasLte() {
+				rules["max"] = int(ur.GetLte())
+			}
+		}
+	case *validate.FieldRules_Float:
+		fr := r.Float
+		if fr != nil {
+			if fr.HasGte() {
+				rules["min"] = fr.GetGte()
+			}
+			if fr.HasLte() {
+				rules["max"] = fr.GetLte()
+			}
+		}
+	case *validate.FieldRules_Double:
+		dr := r.Double
+		if dr != nil {
+			if dr.HasGte() {
+				rules["min"] = dr.GetGte()
+			}
+			if dr.HasLte() {
+				rules["max"] = dr.GetLte()
+			}
+		}
+	}
+
+	return rules
 }
 
 func populateMessages(rootSchema map[string]any, msg protoreflect.MessageDescriptor) {
