@@ -4,4 +4,5 @@ services:
     target: "localhost:50051"
     methods:
       - "user.v1.UserService/CreateUser"
+      - "user.v1.UserService/ListUsers"
     roles: ["admin"]

@@ -9,6 +9,7 @@ import "form/v1/annotations.proto";
 
 service UserService {
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 }
 
 message CreateUserRequest {
@@ -76,4 +77,39 @@ message Address {
 message CreateUserResponse {
   string message = 1;
   string user_id = 2;
+}
+
+message ListUsersRequest {
+  option (form.v1.title) = "List Users";
+  option (form.v1.description) = "Retrieve a list of all users in the system";
+
+  int32 page_size = 1 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100,
+    (form.v1.field).label = "Page size",
+    (form.v1.field).hint = "Number of users to return (1-100)"
+  ];
+
+  string page_token = 2 [
+    (form.v1.field).label = "Page token",
+    (form.v1.field).hint = "Leave empty for first page"
+  ];
+}
+
+message User {
+  string id = 1;
+  string first_name = 2;
+  string last_name = 3;
+  string email = 4;
+  Role role = 5;
+  repeated string tags = 6;
+  int32 age = 7;
+  string created_at = 8;
+  string status = 9;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
 }

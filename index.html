@@ -372,7 +372,7 @@ async function handleSubmit() {
   }
 
   const data = await res.json();
-  document.getElementById('outputView').innerHTML = highlight(JSON.stringify(data, null, 2));
+  document.getElementById('outputView').innerHTML = renderResponse(data);
 }
 
 function handleReset() {
@@ -396,6 +396,161 @@ function highlight(json) {
     if (/true|false/.test(m)) return `<span class="sb">${m}</span>`;
     return `<span class="sn">${m}</span>`;
   });
+}
+
+function formatLabel(key) {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatValue(val) {
+  if (val === null || val === undefined) return '<span class="response-empty">—</span>';
+  if (typeof val === 'boolean') return val ? 'true' : 'false';
+  if (typeof val === 'number') return String(val);
+  if (typeof val === 'string') {
+    if (val.length > 100) return val.substring(0, 100) + '...';
+    return val || '<span class="response-empty">—</span>';
+  }
+  return String(val);
+}
+
+function isArrayOfObjects(arr) {
+  return Array.isArray(arr) && arr.length >0 && arr.every(item => typeof item === 'object' && item !== null && !Array.isArray(item));
+}
+
+function getAllKeys(arr) {
+  const keys = new Set();
+  arr.forEach(item => {
+    if (typeof item === 'object' && item !== null) {
+      Object.keys(item).forEach(k => keys.add(k));
+    }
+  });
+  return Array.from(keys);
+}
+
+function renderTable(arr) {
+  if (!arr || arr.length === 0) {
+    return '<div class="response-empty">No items</div>';
+  }
+  const keys = getAllKeys(arr);
+  if (keys.length === 0) {
+    return '<div class="response-empty">No data</div>';
+  }
+  
+  let html = '<div class="response-card"><div class="response-card-body" style="padding:0;overflow-x:auto;"><table class="response-table"><thead><tr>';
+  keys.forEach(k => {
+    html += `<th>${formatLabel(k)}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  
+  arr.forEach((item, i) => {
+    html += '<tr>';
+    keys.forEach(k => {
+      const val = item[k];
+      if (typeof val === 'object' && val !== null) {
+        if (Array.isArray(val)) {
+          html += `<td>${renderInlineList(val)}</td>`;
+        } else {
+          html += `<td>${renderInlineObject(val)}</td>`;
+        }
+      } else {
+        html += `<td>${formatValue(val)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
+function renderInlineObject(obj) {
+  if (!obj || Object.keys(obj).length === 0) return '<span class="response-empty">—</span>';
+  const entries = Object.entries(obj).slice(0, 3);
+  let str = entries.map(([k, v]) => `${k}: ${typeof v === 'object' ? '...' : formatValue(v)}`).join(', ');
+  if (Object.keys(obj).length > 3) str += '...';
+  return `<span class="response-primitive" style="font-size:11px;">${str}</span>`;
+}
+
+function renderInlineList(arr) {
+  if (!arr || arr.length === 0) return '<span class="response-empty">—</span>';
+  if (arr.length <= 3) {
+    return arr.map(v => typeof v === 'object' ? '...' : formatValue(v)).join(', ');
+  }
+  return `${arr.length} items`;
+}
+
+function renderList(arr) {
+  if (!arr || arr.length === 0) {
+    return '<div class="response-empty">No items</div>';
+  }
+  let html = '<div class="response-list">';
+  arr.forEach((val, i) => {
+    if (typeof val === 'object' && val !== null) {
+      html += `<div class="response-list-item">${renderInlineObject(val)}</div>`;
+    } else {
+      html += `<div class="response-list-item">${formatValue(val)}</div>`;
+    }
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderResponseField(key, val) {
+  let content;
+  if (val === null || val === undefined) {
+    content = '<span class="response-empty">—</span>';
+  } else if (Array.isArray(val)) {
+    if (isArrayOfObjects(val)) {
+      content = renderTable(val);
+    } else {
+      content = renderList(val);
+    }
+  } else if (typeof val === 'object') {
+    content = renderObjectCard(val, key);
+  } else {
+    content = `<span class="response-primitive">${formatValue(val)}</span>`;
+  }
+  return `<div class="response-field"><div class="response-field-label">${formatLabel(key)}</div><div class="response-field-value">${content}</div></div>`;
+}
+
+function renderObjectCard(obj, title) {
+  if (!obj || Object.keys(obj).length === 0) {
+    return '<div class="response-empty">No data</div>';
+  }
+  let html = '<div class="response-card">';
+  if (title) {
+    html += `<div class="response-card-header">${formatLabel(title)}</div>`;
+  }
+  html += '<div class="response-card-body">';
+  Object.entries(obj).forEach(([k, v]) => {
+    html += renderResponseField(k, v);
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function renderResponse(data) {
+  if (data === null || data === undefined) {
+    return '<div class="response-empty">No response data</div>';
+  }
+  
+  let html = '<div class="response-success-header"><span class="response-success-icon">✓</span><span class="response-success-title">Request completed successfully</span></div>';
+  html += '<div class="response-container">';
+  
+  if (Array.isArray(data)) {
+    if (isArrayOfObjects(data)) {
+      html += renderTable(data);
+    } else {
+      html += renderList(data);
+    }
+  } else if (typeof data === 'object') {
+    html += renderObjectCard(data);
+  } else {
+    html += `<div class="response-primitive">${formatValue(data)}</div>`;
+  }
+  
+  html += '</div>';
+  return html;
 }
 </script>
 </body>
