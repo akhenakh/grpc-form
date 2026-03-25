@@ -21,17 +21,23 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 	"gopkg.in/yaml.v3"
 
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
+	formv1 "github.com/akhenakh/grpc-form/gen/form/v1"
 )
 
 const appName = "admin-form-gateway"
 
 //go:embed index.html
 var indexHTML []byte
+
+//go:embed validate.css
+var validateCSS []byte
 
 // EnvConfig holds server-level configuration from environment variables.
 type EnvConfig struct {
@@ -178,6 +184,10 @@ func (g *Gateway) router() *http.ServeMux {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)
 	})
+	mux.HandleFunc("/assets/validate.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+		w.Write(validateCSS)
+	})
 	mux.HandleFunc("/api/methods", g.handleListMethods)
 	mux.HandleFunc("/api/schema", g.handleGetSchema)
 	mux.HandleFunc("/api/invoke", g.handleInvoke)
@@ -300,9 +310,10 @@ func (g *Gateway) handleInvoke(w http.ResponseWriter, r *http.Request) {
 // --- Schema Builders ---
 
 func buildUISchema(msg protoreflect.MessageDescriptor) map[string]interface{} {
+	title, desc := getMessageOptions(msg)
 	schema := map[string]interface{}{
-		"title":       string(msg.Name()),
-		"description": "",
+		"title":       title,
+		"description": desc,
 		"fields":      []map[string]interface{}{},
 		"enums":       map[string]interface{}{},
 		"messages":    map[string]interface{}{},
@@ -317,6 +328,16 @@ func buildUISchema(msg protoreflect.MessageDescriptor) map[string]interface{} {
 	return schema
 }
 
+func getMessageOptions(msg protoreflect.MessageDescriptor) (title, description string) {
+	opts := msg.Options().(*descriptorpb.MessageOptions)
+	if opts == nil {
+		return
+	}
+	title, _ = proto.GetExtension(opts, formv1.E_Title).(string)
+	description, _ = proto.GetExtension(opts, formv1.E_Description).(string)
+	return
+}
+
 func buildFieldSchema(rootSchema map[string]interface{}, field protoreflect.FieldDescriptor) map[string]interface{} {
 	fType := field.Kind().String()
 
@@ -328,14 +349,32 @@ func buildFieldSchema(rootSchema map[string]interface{}, field protoreflect.Fiel
 		populateEnums(rootSchema, field.Enum())
 	}
 
+	label := strings.Title(strings.ReplaceAll(string(field.Name()), "_", " "))
+	hidden := false
+	placeholder := ""
+	hint := ""
+
+	if opts := field.Options().(*descriptorpb.FieldOptions); opts != nil {
+		if ext := proto.GetExtension(opts, formv1.E_Field); ext != nil {
+			if fo, ok := ext.(*formv1.FieldOptions); ok {
+				if fo.Label != "" {
+					label = fo.Label
+				}
+				hidden = fo.Hidden
+				placeholder = fo.Placeholder
+				hint = fo.Hint
+			}
+		}
+	}
+
 	fSchema := map[string]interface{}{
 		"name":        string(field.Name()),
 		"type":        fType,
 		"repeated":    field.IsList(),
-		"label":       strings.Title(strings.ReplaceAll(string(field.Name()), "_", " ")),
-		"hidden":      false,
-		"placeholder": "",
-		"hint":        "",
+		"label":       label,
+		"hidden":      hidden,
+		"placeholder": placeholder,
+		"hint":        hint,
 		"validate":    map[string]interface{}{},
 		"isEnum":      field.Kind() == protoreflect.EnumKind,
 		"isMessage":   field.Kind() == protoreflect.MessageKind,
