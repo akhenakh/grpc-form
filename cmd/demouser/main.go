@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	// Import the generated code
 	userv1 "github.com/akhenakh/grpc-form/gen/user/v1"
 )
 
@@ -40,6 +40,8 @@ func (s *server) CreateUser(ctx context.Context, req *userv1.CreateUserRequest) 
 
 func main() {
 	port := 50051
+	enableReflection := os.Getenv("ENABLE_GRPC_REFLECTION") == "true"
+
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -47,13 +49,17 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
-	// 1. Register our Service
+	// Register our Service
 	userv1.RegisterUserServiceServer(grpcServer, &server{})
 
-	// 2. Enable gRPC Server Reflection (CRITICAL for the API Gateway)
-	reflection.Register(grpcServer)
+	// Enable gRPC Server Reflection only when explicitly enabled
+	// WARNING: Disable in production to prevent service discovery by unauthorized clients
+	if enableReflection {
+		reflection.Register(grpcServer)
+		log.Printf("WARNING: gRPC reflection enabled - not recommended for production")
+	}
 
-	log.Printf("Demo gRPC User Service listening on port %d...", port)
+	log.Printf("Demo gRPC User Service listening on port %d (reflection: %v)...", port, enableReflection)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

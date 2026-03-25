@@ -51,8 +51,20 @@ func (g *Gateway) Close() {
 	}
 }
 
+// securityHeadersMiddleware adds HTTP security headers to all responses.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		next.ServeHTTP(w, r)
+	})
+}
+
 // router sets up the HTTP multiplexer.
-func (g *Gateway) router() *http.ServeMux {
+func (g *Gateway) router() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -69,7 +81,15 @@ func (g *Gateway) router() *http.ServeMux {
 	mux.HandleFunc("/api/methods", g.handleListMethods)
 	mux.HandleFunc("/api/schema", g.handleGetSchema)
 	mux.HandleFunc("/api/invoke", g.handleInvoke)
-	return mux
+	return securityHeadersMiddleware(mux)
+}
+
+func parseMethodName(methodName string) (svcName, mName string, ok bool) {
+	idx := strings.LastIndex(methodName, "/")
+	if idx <= 0 || idx >= len(methodName)-1 {
+		return "", "", false
+	}
+	return methodName[:idx], methodName[idx+1:], true
 }
 
 func (g *Gateway) handleListMethods(w http.ResponseWriter, r *http.Request) {
@@ -94,8 +114,11 @@ func (g *Gateway) handleListMethods(w http.ResponseWriter, r *http.Request) {
 
 				client, ok := g.clients[svc.ID]
 				if ok {
-					svcName := m[:strings.LastIndex(m, "/")]
-					mName := m[strings.LastIndex(m, "/")+1:]
+					svcName, mName, valid := parseMethodName(m)
+					if !valid {
+						g.logger.Warn("invalid method format in config", "method", m)
+						continue
+					}
 
 					if svcDesc, err := client.ResolveService(svcName); err == nil {
 						if methodDesc := svcDesc.FindMethodByName(mName); methodDesc != nil {
@@ -122,6 +145,19 @@ func (g *Gateway) handleListMethods(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func isValidServiceMethod(serviceID, methodName string, services []ServiceConfig) bool {
+	for _, svc := range services {
+		if svc.ID == serviceID {
+			for _, m := range svc.Methods {
+				if m == methodName {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (g *Gateway) handleGetSchema(w http.ResponseWriter, r *http.Request) {
 	userRole := r.Header.Get("X-User-Role")
 	if userRole == "" && !g.devMode {
@@ -132,14 +168,27 @@ func (g *Gateway) handleGetSchema(w http.ResponseWriter, r *http.Request) {
 	serviceID := r.URL.Query().Get("service_id")
 	methodName := r.URL.Query().Get("method")
 
+	if serviceID == "" || methodName == "" {
+		http.Error(w, "service_id and method parameters are required", http.StatusBadRequest)
+		return
+	}
+
 	client, ok := g.clients[serviceID]
 	if !ok {
 		http.Error(w, "Service ID not found", http.StatusNotFound)
 		return
 	}
 
-	svcName := methodName[:strings.LastIndex(methodName, "/")]
-	mName := methodName[strings.LastIndex(methodName, "/")+1:]
+	if !isValidServiceMethod(serviceID, methodName, g.services) {
+		http.Error(w, "Invalid service or method", http.StatusBadRequest)
+		return
+	}
+
+	svcName, mName, valid := parseMethodName(methodName)
+	if !valid {
+		http.Error(w, "Invalid method format, expected 'package.Service/Method'", http.StatusBadRequest)
+		return
+	}
 
 	svcDesc, err := client.ResolveService(svcName)
 	if err != nil {
@@ -199,17 +248,30 @@ func (g *Gateway) handleInvoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svcName := methodName[:strings.LastIndex(methodName, "/")]
-	mName := methodName[strings.LastIndex(methodName, "/")+1:]
+	svcName, mName, valid := parseMethodName(methodName)
+	if !valid {
+		http.Error(w, "Invalid method format, expected 'package.Service/Method'", http.StatusBadRequest)
+		return
+	}
 
-	svcDesc, _ := client.ResolveService(svcName)
-	methodDesc := svcDesc.FindMethodByName(mName).UnwrapMethod()
+	svcDesc, err := client.ResolveService(svcName)
+	if err != nil {
+		g.logger.Error("reflection failed to resolve service", "service", svcName, "error", err)
+		http.Error(w, "Service not found", http.StatusNotFound)
+		return
+	}
+	methodDesc := svcDesc.FindMethodByName(mName)
+	if methodDesc == nil {
+		http.Error(w, "Method not found", http.StatusNotFound)
+		return
+	}
+	unwrappedMethod := methodDesc.UnwrapMethod()
 
 	body, _ := io.ReadAll(r.Body)
 
 	// Create dynamic protobuf message
-	reqMsg := dynamicpb.NewMessage(methodDesc.Input())
-	respMsg := dynamicpb.NewMessage(methodDesc.Output())
+	reqMsg := dynamicpb.NewMessage(unwrappedMethod.Input())
+	respMsg := dynamicpb.NewMessage(unwrappedMethod.Output())
 
 	if err := protojson.Unmarshal(body, reqMsg); err != nil {
 		g.logger.Warn("invalid JSON payload", "error", err)
