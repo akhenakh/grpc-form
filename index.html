@@ -259,8 +259,12 @@ async function handleSubmit() {
     if (f.hidden) continue;
     if (f.repeated) {
       payload[f.name] = (repeated[f.name] || []).filter(Boolean);
+    } else if (f.isEnum) {
+      if (values[f.name] != null && values[f.name] !== '' && values[f.name] !== undefined) {
+        payload[f.name] = +values[f.name];
+      }
     } else if (values[f.name] != null && values[f.name] !== '') {
-      payload[f.name] = f.type.includes('TYPE_INT') || f.type.includes('TYPE_DOUBLE') ? +values[f.name] : values[f.name];
+      payload[f.name] = f.type.includes('TYPE_INT') || f.type.includes('TYPE_DOUBLE') || f.type === 'int32' || f.type === 'int64' || f.type === 'uint32' || f.type === 'uint64' || f.type === 'float' || f.type === 'double' ? +values[f.name] : values[f.name];
     }
   }
 

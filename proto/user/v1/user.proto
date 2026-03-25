@@ -12,35 +12,65 @@ service UserService {
 }
 
 message CreateUserRequest {
-  option (form.v1.title) = "Create New User";
-  option (form.v1.description) = "Provision a new user account in the system.";
+  option (form.v1.title) = "Create user";
+  option (form.v1.description) = "Add a new user to the system";
 
-  string username = 1 [
-    (buf.validate.field).string.min_len = 3,
-    (buf.validate.field).string.max_len = 32,
-    (form.v1.field).label = "Username",
-    (form.v1.field).placeholder = "johndoe88"
+  string first_name = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).string.max_len = 64,
+    (form.v1.field).label = "First name",
+    (form.v1.field).placeholder = "Jane"
   ];
 
-  string firstname = 2 [
+  string last_name = 2 [
     (buf.validate.field).string.min_len = 1,
-    (form.v1.field).label = "First Name",
-    (form.v1.field).hint = "User's legal first name"
+    (form.v1.field).label = "Last name",
+    (form.v1.field).placeholder = "Smith"
   ];
 
   string email = 3 [
     (buf.validate.field).string.email = true,
-    (form.v1.field).label = "Email Address"
+    (form.v1.field).label = "Email address",
+    (form.v1.field).hint = "Must be a valid corporate email"
   ];
 
-  // We hide the UUID field from the form.
-  // IGNORE_IF_ZERO_VALUE ensures protovalidate skips the UUID check 
-  // if the field is omitted/empty (which it will be, since it's hidden).
-  string uuid = 4 [
-    (buf.validate.field).string.uuid = true,
-    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE, 
-    (form.v1.field).hidden = true
+  Role role = 4 [(form.v1.field).label = "Role"];
+
+  repeated string tags = 5 [
+    (form.v1.field).label = "Tags",
+    (form.v1.field).hint = "Press + to add"
   ];
+
+  Address address = 6 [
+    (form.v1.field).label = "Address",
+    (form.v1.field).collapsible = true
+  ];
+
+  string internal_id = 7 [(form.v1.field).hidden = true];
+
+  int32 age = 8 [
+    (buf.validate.field).int32.gte = 18,
+    (buf.validate.field).int32.lte = 120,
+    (form.v1.field).label = "Age"
+  ];
+
+  oneof contact_method {
+    string phone = 9 [(form.v1.field).label = "Phone"];
+    string slack_handle = 10 [(form.v1.field).label = "Slack"];
+  }
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_VIEWER = 1;
+  ROLE_EDITOR = 2;
+  ROLE_ADMIN = 3;
+}
+
+message Address {
+  string street = 1 [(form.v1.field).label = "Street"];
+  string city = 2 [(form.v1.field).label = "City"];
+  string zip = 3 [(form.v1.field).label = "ZIP code"];
 }
 
 message CreateUserResponse {

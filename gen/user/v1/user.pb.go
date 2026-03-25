@@ -23,15 +23,73 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Role int32
+
+const (
+	Role_ROLE_UNSPECIFIED Role = 0
+	Role_ROLE_VIEWER      Role = 1
+	Role_ROLE_EDITOR      Role = 2
+	Role_ROLE_ADMIN       Role = 3
+)
+
+// Enum value maps for Role.
+var (
+	Role_name = map[int32]string{
+		0: "ROLE_UNSPECIFIED",
+		1: "ROLE_VIEWER",
+		2: "ROLE_EDITOR",
+		3: "ROLE_ADMIN",
+	}
+	Role_value = map[string]int32{
+		"ROLE_UNSPECIFIED": 0,
+		"ROLE_VIEWER":      1,
+		"ROLE_EDITOR":      2,
+		"ROLE_ADMIN":       3,
+	}
+)
+
+func (x Role) Enum() *Role {
+	p := new(Role)
+	*p = x
+	return p
+}
+
+func (x Role) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Role) Descriptor() protoreflect.EnumDescriptor {
+	return file_user_v1_user_proto_enumTypes[0].Descriptor()
+}
+
+func (Role) Type() protoreflect.EnumType {
+	return &file_user_v1_user_proto_enumTypes[0]
+}
+
+func (x Role) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Role.Descriptor instead.
+func (Role) EnumDescriptor() ([]byte, []int) {
+	return file_user_v1_user_proto_rawDescGZIP(), []int{0}
+}
+
 type CreateUserRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	Username  string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Firstname string                 `protobuf:"bytes,2,opt,name=firstname,proto3" json:"firstname,omitempty"`
-	Email     string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
-	// We hide the UUID field from the form.
-	// IGNORE_IF_ZERO_VALUE ensures protovalidate skips the UUID check
-	// if the field is omitted/empty (which it will be, since it's hidden).
-	Uuid          string `protobuf:"bytes,4,opt,name=uuid,proto3" json:"uuid,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	FirstName  string                 `protobuf:"bytes,1,opt,name=first_name,json=firstName,proto3" json:"first_name,omitempty"`
+	LastName   string                 `protobuf:"bytes,2,opt,name=last_name,json=lastName,proto3" json:"last_name,omitempty"`
+	Email      string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	Role       Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=user.v1.Role" json:"role,omitempty"`
+	Tags       []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	Address    *Address               `protobuf:"bytes,6,opt,name=address,proto3" json:"address,omitempty"`
+	InternalId string                 `protobuf:"bytes,7,opt,name=internal_id,json=internalId,proto3" json:"internal_id,omitempty"`
+	Age        int32                  `protobuf:"varint,8,opt,name=age,proto3" json:"age,omitempty"`
+	// Types that are valid to be assigned to ContactMethod:
+	//
+	//	*CreateUserRequest_Phone
+	//	*CreateUserRequest_SlackHandle
+	ContactMethod isCreateUserRequest_ContactMethod `protobuf_oneof:"contact_method"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -66,16 +124,16 @@ func (*CreateUserRequest) Descriptor() ([]byte, []int) {
 	return file_user_v1_user_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *CreateUserRequest) GetUsername() string {
+func (x *CreateUserRequest) GetFirstName() string {
 	if x != nil {
-		return x.Username
+		return x.FirstName
 	}
 	return ""
 }
 
-func (x *CreateUserRequest) GetFirstname() string {
+func (x *CreateUserRequest) GetLastName() string {
 	if x != nil {
-		return x.Firstname
+		return x.LastName
 	}
 	return ""
 }
@@ -87,9 +145,138 @@ func (x *CreateUserRequest) GetEmail() string {
 	return ""
 }
 
-func (x *CreateUserRequest) GetUuid() string {
+func (x *CreateUserRequest) GetRole() Role {
 	if x != nil {
-		return x.Uuid
+		return x.Role
+	}
+	return Role_ROLE_UNSPECIFIED
+}
+
+func (x *CreateUserRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *CreateUserRequest) GetAddress() *Address {
+	if x != nil {
+		return x.Address
+	}
+	return nil
+}
+
+func (x *CreateUserRequest) GetInternalId() string {
+	if x != nil {
+		return x.InternalId
+	}
+	return ""
+}
+
+func (x *CreateUserRequest) GetAge() int32 {
+	if x != nil {
+		return x.Age
+	}
+	return 0
+}
+
+func (x *CreateUserRequest) GetContactMethod() isCreateUserRequest_ContactMethod {
+	if x != nil {
+		return x.ContactMethod
+	}
+	return nil
+}
+
+func (x *CreateUserRequest) GetPhone() string {
+	if x != nil {
+		if x, ok := x.ContactMethod.(*CreateUserRequest_Phone); ok {
+			return x.Phone
+		}
+	}
+	return ""
+}
+
+func (x *CreateUserRequest) GetSlackHandle() string {
+	if x != nil {
+		if x, ok := x.ContactMethod.(*CreateUserRequest_SlackHandle); ok {
+			return x.SlackHandle
+		}
+	}
+	return ""
+}
+
+type isCreateUserRequest_ContactMethod interface {
+	isCreateUserRequest_ContactMethod()
+}
+
+type CreateUserRequest_Phone struct {
+	Phone string `protobuf:"bytes,9,opt,name=phone,proto3,oneof"`
+}
+
+type CreateUserRequest_SlackHandle struct {
+	SlackHandle string `protobuf:"bytes,10,opt,name=slack_handle,json=slackHandle,proto3,oneof"`
+}
+
+func (*CreateUserRequest_Phone) isCreateUserRequest_ContactMethod() {}
+
+func (*CreateUserRequest_SlackHandle) isCreateUserRequest_ContactMethod() {}
+
+type Address struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Street        string                 `protobuf:"bytes,1,opt,name=street,proto3" json:"street,omitempty"`
+	City          string                 `protobuf:"bytes,2,opt,name=city,proto3" json:"city,omitempty"`
+	Zip           string                 `protobuf:"bytes,3,opt,name=zip,proto3" json:"zip,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Address) Reset() {
+	*x = Address{}
+	mi := &file_user_v1_user_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Address) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Address) ProtoMessage() {}
+
+func (x *Address) ProtoReflect() protoreflect.Message {
+	mi := &file_user_v1_user_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Address.ProtoReflect.Descriptor instead.
+func (*Address) Descriptor() ([]byte, []int) {
+	return file_user_v1_user_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Address) GetStreet() string {
+	if x != nil {
+		return x.Street
+	}
+	return ""
+}
+
+func (x *Address) GetCity() string {
+	if x != nil {
+		return x.City
+	}
+	return ""
+}
+
+func (x *Address) GetZip() string {
+	if x != nil {
+		return x.Zip
 	}
 	return ""
 }
@@ -104,7 +291,7 @@ type CreateUserResponse struct {
 
 func (x *CreateUserResponse) Reset() {
 	*x = CreateUserResponse{}
-	mi := &file_user_v1_user_proto_msgTypes[1]
+	mi := &file_user_v1_user_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -116,7 +303,7 @@ func (x *CreateUserResponse) String() string {
 func (*CreateUserResponse) ProtoMessage() {}
 
 func (x *CreateUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_user_v1_user_proto_msgTypes[1]
+	mi := &file_user_v1_user_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -129,7 +316,7 @@ func (x *CreateUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserResponse.ProtoReflect.Descriptor instead.
 func (*CreateUserResponse) Descriptor() ([]byte, []int) {
-	return file_user_v1_user_proto_rawDescGZIP(), []int{1}
+	return file_user_v1_user_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateUserResponse) GetMessage() string {
@@ -150,16 +337,39 @@ var File_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x12user/v1/user.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x19form/v1/annotations.proto\"\xc0\x02\n" +
+	"\x12user/v1/user.proto\x12\auser.v1\x1a\x1bbuf/validate/validate.proto\x1a\x19form/v1/annotations.proto\"\xe7\x04\n" +
 	"\x11CreateUserRequest\x12>\n" +
-	"\busername\x18\x01 \x01(\tB\"\xbaH\x06r\x04\x10\x03\x18 \x9a\xb5\x18\x15\x12\bUsername\"\tjohndoe88R\busername\x12N\n" +
-	"\tfirstname\x18\x02 \x01(\tB0\xbaH\x04r\x02\x10\x01\x9a\xb5\x18%\x12\n" +
-	"First Name\x1a\x17User's legal first nameR\tfirstname\x120\n" +
-	"\x05email\x18\x03 \x01(\tB\x1a\xbaH\x04r\x02`\x01\x9a\xb5\x18\x0f\x12\rEmail AddressR\x05email\x12%\n" +
-	"\x04uuid\x18\x04 \x01(\tB\x11\xbaH\b\xd8\x01\x01r\x03\xb0\x01\x01\x9a\xb5\x18\x02\b\x01R\x04uuid:B\x8a\xb5\x18\x0fCreate New User\x92\xb5\x18+Provision a new user account in the system.\"G\n" +
+	"\n" +
+	"first_name\x18\x01 \x01(\tB\x1f\xbaH\x06r\x04\x10\x01\x18@\x9a\xb5\x18\x12\x12\n" +
+	"First name\"\x04JaneR\tfirstName\x12:\n" +
+	"\tlast_name\x18\x02 \x01(\tB\x1d\xbaH\x04r\x02\x10\x01\x9a\xb5\x18\x12\x12\tLast name\"\x05SmithR\blastName\x12Q\n" +
+	"\x05email\x18\x03 \x01(\tB;\xbaH\x04r\x02`\x01\x9a\xb5\x180\x12\rEmail address\x1a\x1fMust be a valid corporate emailR\x05email\x12-\n" +
+	"\x04role\x18\x04 \x01(\x0e2\r.user.v1.RoleB\n" +
+	"\x9a\xb5\x18\x06\x12\x04RoleR\x04role\x12.\n" +
+	"\x04tags\x18\x05 \x03(\tB\x1a\x9a\xb5\x18\x16\x12\x04Tags\x1a\x0ePress + to addR\x04tags\x12;\n" +
+	"\aaddress\x18\x06 \x01(\v2\x10.user.v1.AddressB\x0f\x9a\xb5\x18\v\x12\aAddress(\x01R\aaddress\x12'\n" +
+	"\vinternal_id\x18\a \x01(\tB\x06\x9a\xb5\x18\x02\b\x01R\n" +
+	"internalId\x12$\n" +
+	"\x03age\x18\b \x01(\x05B\x12\xbaH\x06\x1a\x04\x18x(\x12\x9a\xb5\x18\x05\x12\x03AgeR\x03age\x12#\n" +
+	"\x05phone\x18\t \x01(\tB\v\x9a\xb5\x18\a\x12\x05PhoneH\x00R\x05phone\x120\n" +
+	"\fslack_handle\x18\n" +
+	" \x01(\tB\v\x9a\xb5\x18\a\x12\x05SlackH\x00R\vslackHandle:/\x8a\xb5\x18\vCreate user\x92\xb5\x18\x1cAdd a new user to the systemB\x10\n" +
+	"\x0econtact_method\"q\n" +
+	"\aAddress\x12$\n" +
+	"\x06street\x18\x01 \x01(\tB\f\x9a\xb5\x18\b\x12\x06StreetR\x06street\x12\x1e\n" +
+	"\x04city\x18\x02 \x01(\tB\n" +
+	"\x9a\xb5\x18\x06\x12\x04CityR\x04city\x12 \n" +
+	"\x03zip\x18\x03 \x01(\tB\x0e\x9a\xb5\x18\n" +
+	"\x12\bZIP codeR\x03zip\"G\n" +
 	"\x12CreateUserResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId2T\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId*N\n" +
+	"\x04Role\x12\x14\n" +
+	"\x10ROLE_UNSPECIFIED\x10\x00\x12\x0f\n" +
+	"\vROLE_VIEWER\x10\x01\x12\x0f\n" +
+	"\vROLE_EDITOR\x10\x02\x12\x0e\n" +
+	"\n" +
+	"ROLE_ADMIN\x10\x032T\n" +
 	"\vUserService\x12E\n" +
 	"\n" +
 	"CreateUser\x12\x1a.user.v1.CreateUserRequest\x1a\x1b.user.v1.CreateUserResponseB2Z0github.com/akhenakh/grpc-form/gen/user/v1;userv1b\x06proto3"
@@ -176,19 +386,24 @@ func file_user_v1_user_proto_rawDescGZIP() []byte {
 	return file_user_v1_user_proto_rawDescData
 }
 
-var file_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_user_v1_user_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_user_v1_user_proto_goTypes = []any{
-	(*CreateUserRequest)(nil),  // 0: user.v1.CreateUserRequest
-	(*CreateUserResponse)(nil), // 1: user.v1.CreateUserResponse
+	(Role)(0),                  // 0: user.v1.Role
+	(*CreateUserRequest)(nil),  // 1: user.v1.CreateUserRequest
+	(*Address)(nil),            // 2: user.v1.Address
+	(*CreateUserResponse)(nil), // 3: user.v1.CreateUserResponse
 }
 var file_user_v1_user_proto_depIdxs = []int32{
-	0, // 0: user.v1.UserService.CreateUser:input_type -> user.v1.CreateUserRequest
-	1, // 1: user.v1.UserService.CreateUser:output_type -> user.v1.CreateUserResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0, // 0: user.v1.CreateUserRequest.role:type_name -> user.v1.Role
+	2, // 1: user.v1.CreateUserRequest.address:type_name -> user.v1.Address
+	1, // 2: user.v1.UserService.CreateUser:input_type -> user.v1.CreateUserRequest
+	3, // 3: user.v1.UserService.CreateUser:output_type -> user.v1.CreateUserResponse
+	3, // [3:4] is the sub-list for method output_type
+	2, // [2:3] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_user_v1_user_proto_init() }
@@ -196,18 +411,23 @@ func file_user_v1_user_proto_init() {
 	if File_user_v1_user_proto != nil {
 		return
 	}
+	file_user_v1_user_proto_msgTypes[0].OneofWrappers = []any{
+		(*CreateUserRequest_Phone)(nil),
+		(*CreateUserRequest_SlackHandle)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_v1_user_proto_rawDesc), len(file_user_v1_user_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      1,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_user_v1_user_proto_goTypes,
 		DependencyIndexes: file_user_v1_user_proto_depIdxs,
+		EnumInfos:         file_user_v1_user_proto_enumTypes,
 		MessageInfos:      file_user_v1_user_proto_msgTypes,
 	}.Build()
 	File_user_v1_user_proto = out.File

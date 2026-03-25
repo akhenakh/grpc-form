@@ -21,16 +21,19 @@ type server struct {
 // CreateUser handles the incoming gRPC request
 func (s *server) CreateUser(ctx context.Context, req *userv1.CreateUserRequest) (*userv1.CreateUserResponse, error) {
 	log.Printf("Received CreateUser request:")
-	log.Printf(" - Username:  %s", req.GetUsername())
-	log.Printf(" - Firstname: %s", req.GetFirstname())
+	log.Printf(" - FirstName: %s", req.GetFirstName())
+	log.Printf(" - LastName:  %s", req.GetLastName())
 	log.Printf(" - Email:     %s", req.GetEmail())
-	log.Printf(" - UUID:      %s (hidden in UI)", req.GetUuid())
+	log.Printf(" - Role:      %v", req.GetRole())
+	log.Printf(" - Tags:      %v", req.GetTags())
+	log.Printf(" - Age:       %d", req.GetAge())
+	log.Printf(" - Address:   %v", req.GetAddress())
+	log.Printf(" - Contact:   %v", req.GetContactMethod())
 
-	// Pretend we saved the user to a database...
 	newID := "user-12345"
 
 	return &userv1.CreateUserResponse{
-		Message: fmt.Sprintf("User %s successfully created!", req.GetUsername()),
+		Message: fmt.Sprintf("User %s %s successfully created!", req.GetFirstName(), req.GetLastName()),
 		UserId:  newID,
 	}, nil
 }
