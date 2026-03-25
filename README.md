@@ -59,3 +59,80 @@ The gateway reads the `X-User-Role` header to determine the user's role. Only me
 | `ALLOW_DEV_MODE` | false | When true, allows requests without X-User-Role header (defaults to admin). **Do not enable in production.** |
 
 **Security Note**: By default (`ALLOW_DEV_MODE=false`), the gateway requires a valid `X-User-Role` header. Set `ALLOW_DEV_MODE=true` only for local development.
+
+## Proto Form Options
+
+You can customize how forms appear in the admin UI using custom protobuf annotations in your `.proto` files.
+
+### Message-Level Options
+
+Apply to your request/response message:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `title` | string | Display title for the form |
+| `description` | string | Help text shown below the title |
+
+Example:
+```protobuf
+message CreateUserRequest {
+  option (form.v1.title) = "Create New User";
+  option (form.v1.description) = "Provision a new user account in the system.";
+  // ...
+}
+```
+
+### Field-Level Options
+
+Apply to individual fields using `(form.v1.field)`:
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `hidden` | bool | Hide the field from the form |
+| `label` | string | Custom label text (defaults to field name) |
+| `hint` | string | Helper text shown below the input |
+| `placeholder` | string | Placeholder text for input fields |
+| `collapsible` | bool | Make nested message fields collapsible |
+| `order` | int32 | Display order of fields |
+
+Example:
+```protobuf
+message CreateUserRequest {
+  string username = 1 [
+    (buf.validate.field).string.min_len = 3,
+    (form.v1.field).label = "Username",
+    (form.v1.field).placeholder = "johndoe88"
+  ];
+
+  string firstname = 2 [
+    (form.v1.field).label = "First Name",
+    (form.v1.field).hint = "User's legal first name"
+  ];
+
+  // Hidden field - not shown in form
+  string uuid = 4 [
+    (form.v1.field).hidden = true
+  ];
+}
+```
+
+### Compiling Annotations
+
+To use the form annotations, compile the proto file:
+
+```sh
+protoc --go_out=. --go_opt=paths=source_relative form/v1/annotations.proto
+```
+
+Then import and use them in your service protos:
+
+```protobuf
+import "form/v1/annotations.proto";
+
+message CreateUserRequest {
+  option (form.v1.title) = "Create New User";
+  
+  string username = 1 [
+    (form.v1.field).label = "Username"
+  ];
+}
