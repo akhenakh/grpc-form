@@ -231,6 +231,7 @@ func (g *Gateway) handleGetSchema(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Unauthorized: missing X-User-Role header", http.StatusUnauthorized)
 			return
 		}
+		userRole = "admin"
 	}
 
 	serviceID := r.URL.Query().Get("service_id")
@@ -272,6 +273,7 @@ func (g *Gateway) handleInvoke(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Unauthorized: missing X-User-Role header", http.StatusUnauthorized)
 			return
 		}
+		userRole = "admin"
 	}
 
 	serviceID := r.URL.Query().Get("service_id")

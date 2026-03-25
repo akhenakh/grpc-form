@@ -252,10 +252,21 @@ async function handleSubmit() {
     body: JSON.stringify(payload)
   });
 
+  if (!res.ok) {
+    const text = await res.text();
+    let errorMsg = 'Error';
+    try {
+      const data = JSON.parse(text);
+      errorMsg = data.violations || data.error || text;
+    } catch {
+      errorMsg = text;
+    }
+    document.getElementById('outputView').innerHTML = `<span style="color:var(--color-text-danger)">${errorMsg}</span>`;
+    return;
+  }
+
   const data = await res.json();
-  document.getElementById('outputView').innerHTML = res.ok 
-    ? highlight(JSON.stringify(data, null, 2))
-    : `<span style="color:var(--color-text-danger)">${data.violations || data.error || 'Error'}</span>`;
+  document.getElementById('outputView').innerHTML = highlight(JSON.stringify(data, null, 2));
 }
 
 function handleReset() {
