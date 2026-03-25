@@ -83,14 +83,35 @@ func (g *Gateway) handleListMethods(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var allowedMethods []map[string]string
+	var allowedMethods []map[string]any
 	for _, svc := range g.services {
 		if slices.Contains(svc.Roles, userRole) {
 			for _, m := range svc.Methods {
-				allowedMethods = append(allowedMethods, map[string]string{
+				methodInfo := map[string]any{
 					"service_id": svc.ID,
 					"method":     m,
-				})
+				}
+
+				client, ok := g.clients[svc.ID]
+				if ok {
+					svcName := m[:strings.LastIndex(m, "/")]
+					mName := m[strings.LastIndex(m, "/")+1:]
+
+					if svcDesc, err := client.ResolveService(svcName); err == nil {
+						if methodDesc := svcDesc.FindMethodByName(mName); methodDesc != nil {
+							inputDesc := methodDesc.GetInputType().UnwrapMessage()
+							title, description := getMessageOptions(inputDesc)
+							if title != "" {
+								methodInfo["title"] = title
+							}
+							if description != "" {
+								methodInfo["description"] = description
+							}
+						}
+					}
+				}
+
+				allowedMethods = append(allowedMethods, methodInfo)
 			}
 		}
 	}

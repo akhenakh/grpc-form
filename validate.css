@@ -690,3 +690,13 @@ select.field-input {
   border-color: var(--color-text-info);
   background: var(--color-bg-info);
 }
+
+.method-name {
+  font-weight: 500;
+}
+
+.method-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}

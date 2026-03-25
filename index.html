@@ -59,7 +59,8 @@ window.onload = async () => {
   methods.forEach(m => {
     const el = document.createElement('div');
     el.className = 'method-item';
-    el.textContent = m.method.split('/').pop();
+    const displayName = m.title || m.method.split('/').pop();
+    el.innerHTML = `<div class="method-name">${displayName}</div>${m.description ? `<div class="method-desc">${m.description}</div>` : ''}`;
     el.onclick = () => loadSchema(m.service_id, m.method, el);
     list.appendChild(el);
   });
