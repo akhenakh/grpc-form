@@ -332,6 +332,7 @@ func (g *Gateway) handleInvoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := v.Validate(reqMsg); err != nil {
+		g.logger.Warn("validation failed", "method", methodName, "role", userRole, "violations", err.Error())
 		w.WriteHeader(http.StatusBadRequest)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"violations": err.Error()})
@@ -340,9 +341,25 @@ func (g *Gateway) handleInvoke(w http.ResponseWriter, r *http.Request) {
 
 	// 3. Invoke remote gRPC service directly
 	fullMethodName := fmt.Sprintf("/%s/%s", svcName, mName)
+
+	// Audit log: invocation started
+	g.logger.Info("audit: invocation started",
+		"event", "invoke_start",
+		"role", userRole,
+		"service_id", serviceID,
+		"method", methodName,
+		"request", string(body),
+	)
+
 	err = g.channels[serviceID].Invoke(r.Context(), fullMethodName, reqMsg, respMsg)
 	if err != nil {
-		g.logger.Error("grpc invocation failed", "method", fullMethodName, "error", err)
+		g.logger.Error("audit: invocation failed",
+			"event", "invoke_error",
+			"role", userRole,
+			"service_id", serviceID,
+			"method", methodName,
+			"error", err.Error(),
+		)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -351,6 +368,15 @@ func (g *Gateway) handleInvoke(w http.ResponseWriter, r *http.Request) {
 	respJson, _ := protojson.MarshalOptions{EmitUnpopulated: true}.Marshal(respMsg)
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(respJson)
+
+	// Audit log: invocation completed
+	g.logger.Info("audit: invocation completed",
+		"event", "invoke_success",
+		"role", userRole,
+		"service_id", serviceID,
+		"method", methodName,
+		"response", string(respJson),
+	)
 }
 
 // --- Schema Builders ---
@@ -478,7 +504,7 @@ func createLogger(cfg EnvConfig) *slog.Logger {
 		level = slog.LevelDebug
 	}
 
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: level,
 	})
 	return slog.New(handler).With("app", appName)
