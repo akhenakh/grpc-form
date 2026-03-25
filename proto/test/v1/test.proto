@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package test.v1;
+
+option go_package = "github.com/akhenakh/grpc-form/gen/test/v1;testv1";
+
+import "buf/validate/validate.proto";
+import "form/v1/annotations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+message TestMessage {
+  // String validations
+  string string_min_max = 1 [
+    (buf.validate.field).string = {min_len: 5, max_len: 100}
+  ];
+  
+  string string_exact_len = 2 [
+    (buf.validate.field).string.len = 10
+  ];
+  
+  string string_email = 3 [
+    (buf.validate.field).string.email = true
+  ];
+  
+  string string_uuid = 4 [
+    (buf.validate.field).string.uuid = true
+  ];
+  
+  string string_pattern = 5 [
+    (buf.validate.field).string.pattern = "^[A-Z][a-z]+$"
+  ];
+  
+  string string_prefix_suffix = 6 [
+    (buf.validate.field).string = {prefix: "pre_", suffix: "_suf"}
+  ];
+  
+  string string_in = 7 [
+    (buf.validate.field).string = {in: ["one", "two", "three"]}
+  ];
+  
+  string string_const = 8 [
+    (buf.validate.field).string.const = "fixed_value"
+  ];
+  
+  string string_hostname = 9 [
+    (buf.validate.field).string.hostname = true
+  ];
+  
+  string string_uri = 10 [
+    (buf.validate.field).string.uri = true
+  ];
+  
+  string string_ip = 11 [
+    (buf.validate.field).string.ip = true
+  ];
+  
+  // Integer validations
+  int32 int32_range = 20 [
+    (buf.validate.field).int32 = {gte: 0, lte: 100}
+  ];
+  
+  int64 int64_gt_lt = 21 [
+    (buf.validate.field).int64 = {gt: 0, lt: 1000}
+  ];
+  
+  uint32 uint32_in = 22 [
+    (buf.validate.field).uint32 = {in: [1, 2, 5, 10]}
+  ];
+  
+  int32 int32_const = 23 [
+    (buf.validate.field).int32.const = 42
+  ];
+  
+  // Float/Double validations
+  float float_range = 30 [
+    (buf.validate.field).float = {gte: 0.0, lte: 1.0}
+  ];
+  
+  double double_finite = 31 [
+    (buf.validate.field).double.finite = true
+  ];
+  
+  // Bool validation
+  bool bool_const = 40 [
+    (buf.validate.field).bool.const = true
+  ];
+  
+  // Enum validation
+  TestEnum enum_field = 50 [
+    (buf.validate.field).enum.defined_only = true
+  ];
+  
+  TestEnum enum_in = 51 [
+    (buf.validate.field).enum = {in: [1, 2]}
+  ];
+  
+  // Repeated validation
+  repeated string repeated_strings = 60 [
+    (buf.validate.field).repeated = {min_items: 1, max_items: 10}
+  ];
+  
+  repeated int32 repeated_unique = 61 [
+    (buf.validate.field).repeated.unique = true
+  ];
+  
+  // Required field
+  string required_field = 70 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 1
+  ];
+  
+  // Duration validation
+  google.protobuf.Duration duration_range = 80 [
+    (buf.validate.field).duration = {gte: {seconds: 1}, lte: {seconds: 3600}}
+  ];
+  
+  // Timestamp validation
+  google.protobuf.Timestamp timestamp_past = 81 [
+    (buf.validate.field).timestamp.lt_now = true
+  ];
+}
+
+enum TestEnum {
+  TEST_ENUM_UNSPECIFIED = 0;
+  TEST_ENUM_FIRST = 1;
+  TEST_ENUM_SECOND = 2;
+  TEST_ENUM_THIRD = 3;
+}

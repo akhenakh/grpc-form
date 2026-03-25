@@ -140,24 +140,104 @@ function renderField(f) {
   if (f.validate.required) {
     badges.push('<span class="required-asterisk">*</span>');
   }
-  if (f.validate.email) {
-    validationHints.push('email');
-  }
-  if (f.validate.minLen || f.validate.maxLen) {
+  
+  // String validation hints
+  if (f.validate.email) validationHints.push('email');
+  if (f.validate.uuid) validationHints.push('UUID');
+  if (f.validate.tuuid) validationHints.push('TUUID');
+  if (f.validate.hostname) validationHints.push('hostname');
+  if (f.validate.uri) validationHints.push('URI');
+  if (f.validate.uriRef) validationHints.push('URI ref');
+  if (f.validate.ip) validationHints.push('IP');
+  if (f.validate.ipv4) validationHints.push('IPv4');
+  if (f.validate.ipv6) validationHints.push('IPv6');
+  if (f.validate.address) validationHints.push('address');
+  
+  if (f.validate.len) {
+    validationHints.push(`exactly ${f.validate.len} chars`);
+  } else if (f.validate.lenBytes) {
+    validationHints.push(`exactly ${f.validate.lenBytes} bytes`);
+  } else if (f.validate.minLen || f.validate.maxLen) {
     const min = f.validate.minLen || 0;
-    const max = f.validate.maxLen || '';
-    validationHints.push(`${min}${max ? '-' + max : '+'} chars`);
-  }
-  if (f.validate.min != null || f.validate.max != null) {
-    const min = f.validate.min != null ? f.validate.min : '';
-    const max = f.validate.max != null ? f.validate.max : '';
-    if (min !== '' || max !== '') {
-      validationHints.push(`${min}${max ? '-' + max : '+'}`);
+    const max = f.validate.maxLen;
+    if (max) {
+      validationHints.push(`${min}-${max} chars`);
+    } else {
+      validationHints.push(`min ${min} chars`);
     }
   }
-  if (f.validate.pattern) {
-    validationHints.push('pattern');
+  
+  if (f.validate.minBytes || f.validate.maxBytes) {
+    const min = f.validate.minBytes || 0;
+    const max = f.validate.maxBytes;
+    if (max) {
+      validationHints.push(`${min}-${max} bytes`);
+    } else {
+      validationHints.push(`min ${min} bytes`);
+    }
   }
+  
+  if (f.validate.prefix) validationHints.push(`starts with "${f.validate.prefix}"`);
+  if (f.validate.suffix) validationHints.push(`ends with "${f.validate.suffix}"`);
+  if (f.validate.contains) validationHints.push(`contains "${f.validate.contains}"`);
+  if (f.validate.pattern) validationHints.push('pattern');
+  
+  if (f.validate.in && Array.isArray(f.validate.in)) {
+    if (f.validate.in.length <= 5) {
+      validationHints.push(`one of: ${f.validate.in.join(', ')}`);
+    } else {
+      validationHints.push(`${f.validate.in.length} allowed values`);
+    }
+  }
+  
+  if (f.validate.const !== undefined) {
+    if (typeof f.validate.const === 'string') {
+      validationHints.push(`must be "${f.validate.const}"`);
+    } else {
+      validationHints.push(`must be ${f.validate.const}`);
+    }
+  }
+  
+  // Numeric validation hints
+  const hasMin = f.validate.min !== undefined || f.validate.gte !== undefined || f.validate.gt !== undefined;
+  const hasMax = f.validate.max !== undefined || f.validate.lte !== undefined || f.validate.lt !== undefined;
+  
+  if (f.validate.gt !== undefined) {
+    validationHints.push(`> ${f.validate.gt}`);
+  } else if (f.validate.gte !== undefined && !hasMax) {
+    validationHints.push(`>= ${f.validate.gte}`);
+  }
+  
+  if (f.validate.lt !== undefined) {
+    validationHints.push(`< ${f.validate.lt}`);
+  } else if (f.validate.lte !== undefined && !hasMin) {
+    validationHints.push(`<= ${f.validate.lte}`);
+  }
+  
+  if (hasMin && hasMax) {
+    const min = f.validate.min ?? f.validate.gte ?? f.validate.gt;
+    const max = f.validate.max ?? f.validate.lte ?? f.validate.lt;
+    validationHints.push(`${min}-${max}`);
+  }
+  
+  if (f.validate.finite) validationHints.push('finite');
+  
+  // Enum validation hints
+  if (f.validate.definedOnly) validationHints.push('defined only');
+  
+  // Repeated validation hints
+  if (f.validate.minItems) validationHints.push(`min ${f.validate.minItems} items`);
+  if (f.validate.maxItems) validationHints.push(`max ${f.validate.maxItems} items`);
+  if (f.validate.unique) validationHints.push('unique');
+  
+  // Map validation hints
+  if (f.validate.minPairs) validationHints.push(`min ${f.validate.minPairs} pairs`);
+  if (f.validate.maxPairs) validationHints.push(`max ${f.validate.maxPairs} pairs`);
+  
+  // Timestamp validation hints
+  if (f.validate.ltNow) validationHints.push('past');
+  if (f.validate.gtNow) validationHints.push('future');
+  if (f.validate.within) validationHints.push(`within ${f.validate.within}`);
 
   let input;
   const err = errors[f.name] ? 'error' : '';
