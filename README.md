@@ -23,8 +23,6 @@ protoc --go_out=. --go_opt=paths=source_relative form/v1/annotations.proto
 The `config.yaml` file controls which gRPC services are exposed and their role-based access:
 
 ```yaml
-server:
-  port: 8080
 services:
   - id: "user-service"
     name: "User Management"
@@ -34,11 +32,10 @@ services:
     roles: ["admin"]
 ```
 
-### Fields
+### Service Configuration Fields
 
 | Field | Description |
 |-------|-------------|
-| `server.port` | HTTP port for the admin gateway |
 | `services[].id` | Unique identifier for this service |
 | `services[].name` | Display name shown in the UI |
 | `services[].target` | gRPC address of the target microservice |
