@@ -2,6 +2,8 @@
 
 A user-friendly admin interface that generates web forms from your backend services. No coding required for the admin UI—developers define forms once in their service definitions, and the interface builds itself.
 
+![Screenshot of a form generated](./img/grpc-form.jpg)
+
 ## Who Is This For?
 
 **This tool is designed for:**
