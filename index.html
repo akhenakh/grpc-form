@@ -50,7 +50,23 @@
   </div>
 </div>
 
+<button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">◐</button>
+
 <script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const currentTheme = html.getAttribute('data-theme');
+  const newTheme = currentTheme === 'ink' ? 'slate' : 'ink';
+  html.setAttribute('data-theme', newTheme);
+  localStorage.setItem('theme', newTheme);
+}
+
+(function() {
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }
+})();
 let schema, serviceId, method, values = {}, errors = {}, oneofs = {}, repeated = {};
 
 window.onload = async () => {
@@ -112,8 +128,8 @@ function renderForm() {
   }
 
   html += `<div class="submit-row">
-    <button class="primary" onclick="handleSubmit()">Submit</button>
-    <button onclick="handleReset()">Reset</button>
+    <button class="btn btn--primary" onclick="handleSubmit()">Submit</button>
+    <button class="btn btn--reset" onclick="handleReset()">Reset</button>
   </div>`;
 
   const hidden = schema.fields.filter(f => f.hidden).length;
